@@ -39,7 +39,7 @@ def arrange_data(data_df):
     data_df.columns = ['bar_name', 'number2', 'feature1', 'sales_datetime', 'feature2', 
                           'item_name', 'item_class', 'sales_qty', 'feature3', 'sales_value']
     #data_df.sales_value=data_df.sales_value.apply(lambda x: string_to_float(x))
-    data_df.sales_datetime = pd.to_datetime(data_df.sales_datetime, infer_datetime_format=True)#, utc=True
+    data_df.sales_datetime = pd.to_datetime(data_df.sales_datetime, format='mixed', utc=True)
     data_df.set_index('sales_datetime', inplace=True)
     data_df['item_price'] = abs(data_df['sales_value']/data_df['sales_qty'])
     return data_df
@@ -57,7 +57,7 @@ def load_dataset():
                          converters={12: string_to_float},
                          encoding='latin-1')
         data_df = arrange_data(df)
-        all_data_df = all_data_df.append(data_df[columns_to_keep])
+        all_data_df = pd.concat([all_data_df, data_df[columns_to_keep]])
         print("Dataframe shape: ",df.shape)
         #print("Dataframe head: ",df.head())
         end_time = time.time()
@@ -70,7 +70,7 @@ def load_dataset():
     all_data_daily_sales = all_data_df.groupby(['item_name', pd.Grouper(freq='D')]).agg({'sales_qty':'sum', 
                                                                                           'item_price': 'mean', 
                                                                                          'sales_value': 'sum'}).reset_index()
-    print(all_data_daily_sales)
+    print(all_data_daily_sales.head())
 
     return all_data_daily_sales
 
