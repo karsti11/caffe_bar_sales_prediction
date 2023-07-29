@@ -70,6 +70,8 @@ class HolidaysTransformer(BaseEstimator, TransformerMixin):
         X_.loc[:, 'christmas'] = ((X_.index.month==12) & (X_.index.day==25)).astype('int8')
         X_.loc[:, 'new_years_day'] = ((X_.index.month==1) & (X_.index.day==1)).astype('int8')
         X_.loc[:, 'new_years_eve'] = ((X_.index.month==12) & (X_.index.day==31)).astype('int8')
+        X_.loc[:, 'sv_lovre'] = ((X_.index.month==8) & (X_.index.day==10)).astype('int8')
+        X_.loc[:, 'prvi_maj'] = ((X_.index.month==5) & (X_.index.day==1)).astype('int8')
         self.feature_names = X_.columns.tolist()
 
         return X_
