@@ -5,6 +5,7 @@ import streamlit as st
 import plotly.express as px
 import matplotlib.pyplot as plt
 from src.utils import get_project_root
+from src.streamlit_app.helper_functions import load_dataset
 
 
 DATE_FROM = datetime.date(2019, 1, 1)
@@ -13,6 +14,7 @@ DATE_TO = datetime.date(2019, 12, 31)
 DATASETS_FOLDER = get_project_root() / 'data/processed'
 WHOLE_DATASET_PATH = DATASETS_FOLDER / 'dataset_with_predictions.pkl'
 INVENTORY_DATASET_PATH = DATASETS_FOLDER / 'inventory_data_top40.pkl'
+
 
 def get_inventory_on_current_date(inventory_df, items_list, selected_date):
     c1 = (inventory_df.item_name.isin(items_list))
@@ -51,13 +53,11 @@ def visualize_last_365d_sales(sales_df):
     st.plotly_chart(fig, theme="streamlit")
 
 
-
-dataset_with_predictions = pd.read_pickle(WHOLE_DATASET_PATH)
-dataset_with_inventory = pd.read_pickle(INVENTORY_DATASET_PATH)
-all_items = dataset_with_predictions.item_name.unique().tolist()
-
 st.set_page_config(layout="wide")
 
+dataset_with_predictions = load_dataset(WHOLE_DATASET_PATH)
+dataset_with_inventory = load_dataset(INVENTORY_DATASET_PATH)
+all_items = dataset_with_predictions.item_name.unique().tolist()
 # Sidebar
 ## Title
 with st.sidebar:
@@ -71,7 +71,7 @@ with st.sidebar:
              "Select days from current_date for future summary",
              min_value=current_date,
              max_value=current_date + datetime.timedelta(days=90),
-             value=current_date,
+             value=current_date + datetime.timedelta(days=7),
              format="DD/MM/YYYY")
     ## Select dates header
 
