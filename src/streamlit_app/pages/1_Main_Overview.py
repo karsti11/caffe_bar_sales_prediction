@@ -4,6 +4,7 @@ import pandas as pd
 import streamlit as st
 import plotly.express as px
 import matplotlib.pyplot as plt
+from dateutil.relativedelta import relativedelta
 from src.utils import get_project_root
 from src.streamlit_app.helper_functions import load_dataset
 
@@ -42,6 +43,28 @@ def get_last_365d_sales(sales_df, items_list, current_date):
     return sales_by_item
 
 
+def get_yoy_sales(sales_df, current_date):
+    # Calculate total sales YTD and compare with last year, same period
+    current_year = current_date.year
+    last_year = current_year - 1
+    year_ago_date = current_date - relativedelta(years=1)
+
+    c1 = (sales_df.index.year == last_year)
+    c2 = (sales_df.index < str(year_ago_date)) 
+    c3 = (sales_df.index.year == current_year)
+    c4 = (sales_df.index < str(current_date))
+
+    last_year_totals = sales_df[c1 & c2][['sales_qty', 'sales_value']].sum()
+    this_year_totals = sales_df[c3 & c4][['sales_qty', 'sales_value']].sum()
+
+    return (
+        last_year_totals['sales_qty'], 
+        last_year_totals['sales_value'],
+        this_year_totals['sales_qty'],
+        this_year_totals['sales_value']
+        )
+
+
 def visualize_last_365d_sales(sales_df):    
     fig = px.bar(
         sales_df, 
@@ -78,7 +101,18 @@ with st.sidebar:
 
 #with col2:
     # Main screen
-st.header(f'1. Inventory on current date and total predicted sales up to {selected_date}')
+
+st.header(f'1.  KPIs Overview')
+
+last_year_sales_qty, last_year_sales_val, this_year_sales_qty, this_year_sales_val = get_yoy_sales(dataset_with_predictions, current_date)
+col1, col2, col3, col4 = st.columns(4)
+col1.metric("Sales quantity (YTD)", f"{this_year_sales_qty} pcs", f"{-(1 - (this_year_sales_qty/last_year_sales_qty)).round(2)*100} %")
+col2.metric("Sales value (YTD)", f"{this_year_sales_val} pcs", f"{-(1 - (this_year_sales_val/last_year_sales_val)).round(2)*100} %")
+col3.metric("Out of Stock situations", "86%", "4%")
+col4.metric("Forecast accuracy in total (YTD)", "86%", "4 pp")
+
+
+st.header(f'2. Inventory on current date and total predicted sales up to {selected_date}')
 
 inventory_on_current_date = get_inventory_on_current_date(dataset_with_inventory, items_list, current_date)
 aggregated_predictions = get_aggregated_predictions(dataset_with_predictions, items_list, current_date, selected_date).round(1)
@@ -93,7 +127,7 @@ st.dataframe(
         'inventory_at_selected_date': 'Inventory at selected date (End of day)'},
     hide_index=True)
 
-st.header(f'2. All items total sales quantity in 365 days before {current_date}')
+st.header(f'3. All items total sales quantity in 365 days before {current_date}')
 sales_last_365d = get_last_365d_sales(dataset_with_predictions, all_items, current_date)
 visualize_last_365d_sales(sales_last_365d)
 
