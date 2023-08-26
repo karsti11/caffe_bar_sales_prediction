@@ -1,3 +1,5 @@
+import shap
+import xgboost
 import datetime
 import numpy as np
 import pandas as pd
@@ -7,14 +9,16 @@ import plotly.graph_objects as go
 import matplotlib.pyplot as plt
 from src.utils import get_project_root
 from src.evaluation.scoring import wmape, wbias
+from src.streamlit_app.helper_functions import load_booster, load_dataset
 
 
-DATE_FROM = datetime.date(2019, 1, 1)
+DATE_FROM = datetime.date(2017, 1, 1)
 DATE_TO = datetime.date(2019, 12, 31)
 
 DATASETS_FOLDER = get_project_root() / 'data/processed'
 WHOLE_DATASET_PATH = DATASETS_FOLDER / 'dataset_with_predictions.pkl'
 INVENTORY_DATASET_PATH = DATASETS_FOLDER / 'inventory_data_top40.pkl'
+BOOSTER_PATH = get_project_root() / 'models/xgb_caffe_bar_demand_forecast_v1.bst'
 
 
 def visualize_preds(predictions_df, item_name, date_from, current_date, date_to):
@@ -27,7 +31,6 @@ def visualize_preds(predictions_df, item_name, date_from, current_date, date_to)
                 y=['sales_qty', 'prediction'],
                 #barmode="group",
                 labels={'sales_qty': 'Sold quantity', 'prediction':'Predicted daily quantities'},
-                title=f'Sales and predictions for {item_name} from {date_from} to {date_to}',
                 color_discrete_map={'sales_qty': 'blue', 'prediction': 'red'},
                 line_dash_map = {'sales_qty': 'solid', 'prediction': 'dash'},
                 markers=True,
@@ -66,14 +69,14 @@ def visualize_totals(scores_df):
         y=scores_df['total_sales'],
         width=0.4,
         marker=dict(color='rgba(0, 0, 255, 0.5)'),
-        name='sales'
+        name='Sales (in total)'
     ))
     fig.add_trace(go.Bar(
         x=X_axis + 0.2,
         y=scores_df['total_prediction'],
         width=0.4,
         marker=dict(color='rgba(0, 128, 0, 0.5)'),
-        name='prediction'
+        name='Prediction (in total)'
     ))
     # Update x-axis
     fig.update_xaxes(
@@ -122,7 +125,7 @@ def visualize_totals(scores_df):
         y=scores_df['wmape'],
         mode='markers+lines',
         marker=dict(color='red', symbol='circle-open'),
-        name='wmape',
+        name='WMAPE',
         yaxis='y2'
     ))
     # Create line trace for 'bias'
@@ -131,7 +134,7 @@ def visualize_totals(scores_df):
         y=scores_df['bias'],
         mode='markers+lines',
         marker=dict(color='purple', symbol='triangle-up'),
-        name='bias',
+        name='Bias',
         yaxis='y3'
     ))
     # Update legend and layout
@@ -143,50 +146,74 @@ def visualize_totals(scores_df):
             x=0.5,
             y=1,
             xanchor='center',
-            font=dict(size=16)
+            font=dict(size=14)
         ),
-        height=600,
-        width=1200
+        height=650,
+        width=1300
     )
     st.plotly_chart(fig, theme="streamlit")
 
 
+def visualize_shap_waterfall(predictions_df, item_name, prediction_date):
 
-dataset_with_predictions = pd.read_pickle(WHOLE_DATASET_PATH)
-dataset_with_inventory = pd.read_pickle(INVENTORY_DATASET_PATH)
-all_items = dataset_with_predictions.item_name.unique().tolist()
+    c1 = (predictions_df['item_name'] == item_name) 
+    c2 = (predictions_df.index == str(prediction_date))
+
+    explainer = shap.TreeExplainer(booster)
+    print(booster.feature_names)
+    print(predictions_df[c1 & c2])
+    shap_values = explainer(predictions_df[c1 & c2][booster.feature_names])
+
+    prediction = predictions_df[c1 & c2]['prediction'].iloc[0]
+    sales_quantity = predictions_df[c1 & c2]['sales_qty'].iloc[0]
+
+    print(f'Item name:       {item_name}')
+    print(f'Prediction date: {prediction_date}')
+    print()
+    print(f'Predicted value: {prediction:.1f}')
+    print(f'Sales quantity:  {sales_quantity:4f}')
+
+    fig = plt.figure(figsize=(8,16))
+    shap.plots.waterfall(shap_values[0], max_display=20)
+    st.pyplot(fig)  
+
 
 st.set_page_config(layout="wide")
+
+dataset_with_predictions = load_dataset(WHOLE_DATASET_PATH)
+dataset_with_inventory = load_dataset(INVENTORY_DATASET_PATH)
+booster = load_booster(BOOSTER_PATH)
+all_items = dataset_with_predictions.item_name.unique().tolist()
 
 st.title('Model evaluation')
 
 with st.sidebar:
     
     st.title(':female-scientist: Model evaluation :male-scientist:')
-    items_list = st.multiselect('Which items you want to explore?', all_items, default=all_items[:10])
-
-    st.header('Select current date for future summary.')
+    st.header('1. Select current date.')
     current_date = st.date_input("Current date:", datetime.date(2019, 3, 1))
-    selected_date = st.slider(
-             "Select days from current_date for future summary",
-             min_value=DATE_FROM,
-             max_value=current_date + datetime.timedelta(days=90),
-             value=current_date,
-             format="DD/MM/YYYY")
-    ## Select dates header
-    st.subheader('Select dates for sales forecast.')
+    st.header('2. Select demand forecast analysis inputs.')
     ## Input date range for predictions
     date_from = st.date_input("From date:", DATE_FROM)
     date_to = st.date_input("To date:", DATE_TO)
-    #st.write(f"Generation of predictions from {date_from} to {date_to}")
-    # Select items header
-    st.subheader('Select items for sales forecast.')
+    selected_item = st.selectbox('Select item to visualize predictions.', all_items)
+    selected_date = st.slider(
+             "Select date for single prediction analysis",
+             min_value=date_from,
+             max_value=date_to,
+             value=current_date,
+             format="DD/MM/YYYY")
 
   
 scores_df = calculate_scores_per_item_last_365d(dataset_with_predictions, current_date)
+st.header(f'1. Visualize total scores per item for last 365 days before current date')
 visualize_totals(scores_df)
 
-option = st.selectbox('Select item to visualize predictions.', items_list)
-if option:
-    with st.container():
-        visualize_preds(dataset_with_predictions, option, date_from, current_date, selected_date)
+st.header(f'2. Visualize predictions for a single item ({date_from} to {date_to})')
+visualize_preds(dataset_with_predictions, selected_item, date_from, current_date, date_to)
+
+st.subheader(f'2.1 Visualize single prediction feature importances: {selected_date}')
+visualize_shap_waterfall(dataset_with_predictions, selected_item, selected_date)
+
+
+
