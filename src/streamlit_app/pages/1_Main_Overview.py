@@ -6,6 +6,7 @@ import plotly.express as px
 import matplotlib.pyplot as plt
 from dateutil.relativedelta import relativedelta
 from src.utils import get_project_root
+from src.evaluation.scoring import wbias, wmape, bias
 from src.streamlit_app.helper_functions import load_dataset
 
 
@@ -43,26 +44,85 @@ def get_last_365d_sales(sales_df, items_list, current_date):
     return sales_by_item
 
 
-def get_yoy_sales(sales_df, current_date):
-    # Calculate total sales YTD and compare with last year, same period
-    current_year = current_date.year
-    last_year = current_year - 1
-    year_ago_date = current_date - relativedelta(years=1)
 
-    c1 = (sales_df.index.year == last_year)
-    c2 = (sales_df.index < str(year_ago_date)) 
-    c3 = (sales_df.index.year == current_year)
-    c4 = (sales_df.index < str(current_date))
+class KPIsCalculation:
 
-    last_year_totals = sales_df[c1 & c2][['sales_qty', 'sales_value']].sum()
-    this_year_totals = sales_df[c3 & c4][['sales_qty', 'sales_value']].sum()
+    def __init__(self, current_date):
+        self.current_date = current_date
+        self.current_year = self.current_date.year
+        self.last_year = self.current_year - 1
+        self.year_ago_date = self.current_date - relativedelta(years=1)
 
-    return (
-        last_year_totals['sales_qty'], 
-        last_year_totals['sales_value'],
-        this_year_totals['sales_qty'],
-        this_year_totals['sales_value']
-        )
+
+    def get_yoy_sales(self, sales_df):
+        # Calculate total sales YTD and compare with last year, same period
+
+        c1 = (sales_df.index.year == self.last_year)
+        c2 = (sales_df.index < str(self.year_ago_date)) 
+        c3 = (sales_df.index.year == self.current_year)
+        c4 = (sales_df.index < str(self.current_date))
+
+        last_year_totals = sales_df[c1 & c2][['sales_qty', 'sales_value']].sum()
+        this_year_totals = sales_df[c3 & c4][['sales_qty', 'sales_value']].sum()
+
+        percent_change_qty = -(1 - (this_year_totals['sales_qty']/last_year_totals['sales_qty'])).round(2)*100
+        percent_change_val = -(1 - (this_year_totals['sales_value']/last_year_totals['sales_value'])).round(2)*100
+
+        return (
+            this_year_totals['sales_qty'],
+            this_year_totals['sales_value'],
+            percent_change_qty,
+            percent_change_val
+            )
+
+     
+    def get_yoy_predictions(self, predictions_df):
+        # Predictions
+        c1 = (predictions_df.index.year == self.last_year)
+        c2 = (predictions_df.index < str(self.year_ago_date)) 
+        c3 = (predictions_df.index.year == self.current_year)
+        c4 = (predictions_df.index < str(self.current_date))
+
+        last_year_preds = predictions_df[c1 & c2][['sales_qty', 'prediction']]
+        this_year_preds = predictions_df[c3 & c4][['sales_qty', 'prediction']]
+
+        last_year_wmape = wmape(last_year_preds['sales_qty'], last_year_preds['prediction'])
+        this_year_wmape = wmape(this_year_preds['sales_qty'], this_year_preds['prediction'])
+
+        last_year_bias = bias(last_year_preds['sales_qty'], last_year_preds['prediction'])
+        this_year_bias = bias(this_year_preds['sales_qty'], this_year_preds['prediction'])
+
+        wmape_pp_change = last_year_wmape - this_year_wmape
+        bias_pp_change = abs(last_year_bias) - abs(this_year_bias)
+
+        return (
+            wmape_pp_change,
+            bias_pp_change,
+            this_year_wmape,
+            this_year_bias
+            )
+
+
+    def get_yoy_inventory(self, inventory_df):    
+
+        # Inventory
+        c1 = (inventory_df.index.year == self.last_year)
+        c2 = (inventory_df.index < str(self.year_ago_date)) 
+        c3 = (inventory_df.index.year == self.current_year)
+        c4 = (inventory_df.index < str(self.current_date))
+
+        last_year_inv = inventory_df[c1 & c2][['sales_qty', 'inventory']]
+        this_year_inv = inventory_df[c3 & c4][['sales_qty', 'inventory']]  
+
+        last_year_oos_cases= len(last_year_inv[(last_year_inv.inventory < last_year_inv.sales_qty)])
+        this_year_oos_cases= len(this_year_inv[(this_year_inv.inventory < this_year_inv.sales_qty)])
+
+        percent_change_cases = round(-(1 - (this_year_oos_cases/last_year_oos_cases))*100, 1)
+
+        return (
+            percent_change_cases,
+            this_year_oos_cases
+            ) 
 
 
 def visualize_last_365d_sales(sales_df):    
@@ -104,12 +164,19 @@ with st.sidebar:
 
 st.header(f'1.  KPIs Overview')
 
-last_year_sales_qty, last_year_sales_val, this_year_sales_qty, this_year_sales_val = get_yoy_sales(dataset_with_predictions, current_date)
-col1, col2, col3, col4 = st.columns(4)
-col1.metric("Sales quantity (YTD)", f"{this_year_sales_qty} pcs", f"{-(1 - (this_year_sales_qty/last_year_sales_qty)).round(2)*100} %")
-col2.metric("Sales value (YTD)", f"{this_year_sales_val} pcs", f"{-(1 - (this_year_sales_val/last_year_sales_val)).round(2)*100} %")
-col3.metric("Out of Stock situations", "86%", "4%")
-col4.metric("Forecast accuracy in total (YTD)", "86%", "4 pp")
+kpis_calculation = KPIsCalculation(current_date)
+
+this_year_sales_qty, this_year_sales_val, percent_change_qty, percent_change_val = kpis_calculation.get_yoy_sales(dataset_with_predictions)
+wmape_pp_change, bias_pp_change, this_year_wmape, this_year_bias = kpis_calculation.get_yoy_predictions(dataset_with_predictions)
+percent_change_cases, this_year_oos_cases = kpis_calculation.get_yoy_inventory(dataset_with_inventory)
+
+col1, col2, col3 = st.columns(3)
+col1.metric("Sales quantity (YTD)", f"{this_year_sales_qty} pcs", f"{percent_change_qty} %")
+col1.metric("Sales value (YTD)", f"{this_year_sales_val} Kn", f"{percent_change_val} %")
+col2.metric("Forecast error (YTD - on average)", f"{this_year_wmape} %", f"{wmape_pp_change} pp")
+col2.metric("Forecast bias in total (YTD)", f"{this_year_bias} %", f"{bias_pp_change} pp")
+col3.metric("Out of Stock situations", f"{this_year_oos_cases} cases", f"{percent_change_cases} %")
+
 
 
 st.header(f'2. Inventory on current date and total predicted sales up to {selected_date}')
