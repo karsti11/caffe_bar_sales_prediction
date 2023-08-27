@@ -22,7 +22,7 @@ def wmape(actual: pd.Series, forecast: pd.Series):
     if denominator == 0:
         denominator = 1.0
     score = (numerator/denominator)*100
-    return round(score, 2)
+    return round(score, 1)
 
 
 def wbias(actual: pd.Series, forecast: pd.Series):
@@ -43,12 +43,12 @@ def wbias(actual: pd.Series, forecast: pd.Series):
     if denominator == 0:
         denominator = 1.0
     score = (numerator/denominator)*100
-    return round(score, 2)
+    return round(score, 1)
 
 
 def bias(actual: pd.Series, forecast: pd.Series):
 
-    return (1 - (actual.sum() / forecast.sum()))*100
+    return round((1 - (actual.sum() / forecast.sum()))*100, 1)
 
 
 def calculate_errors(y_train: pd.Series, 
