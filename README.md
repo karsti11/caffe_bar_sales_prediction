@@ -25,15 +25,18 @@ Welcome to the Caffe Bar Sales Forecast and Inventory Monitoring Dashboard! This
 
 To get started, follow these simple steps:
 1. Clone the repository to your local machine:
-git clone https://github.com/karsti11/caffe_bar_sales_prediction.git
+```python  
+	git clone https://github.com/karsti11/caffe_bar_sales_prediction.git
+```
 2. Install the necessary dependencies:
-pip install -r requirements.txt
+```python  
+	pip install -r requirements.txt
+```
 3. Run the Streamlit app:
--In project root folder (caffe_bar_sales_prediction/)
-	- streamlit run src/streamlit_app/Introduction.py
-4. Open your web browser and navigate to the provided local URL to access the dashboard.
-
-
+	- In project root folder (caffe_bar_sales_prediction/) run following command:
+```python 
+		streamlit run src/streamlit_app/Introduction.py
+```
 4. Open your web browser and navigate to the provided local URL to access the dashboard.
 
 
