@@ -146,7 +146,7 @@ all_items = dataset_with_predictions.item_name.unique().tolist()
 with st.sidebar:
     st.title(':chart_with_upwards_trend: Main Overview :chart_with_upwards_trend:')
     st.subheader('1. Select items')
-    items_list = st.multiselect('Which items you want inventory and predictions summary for?', all_items, default=all_items[:10])
+    items_list = st.multiselect('Which items you want inventory and predictions summary for?', all_items, default=all_items)
     st.subheader('2. Select current date')
     current_date = st.date_input("Current date:", datetime.date(2019, 3, 1))
     st.subheader('3. Select last date in future')
@@ -162,8 +162,8 @@ with st.sidebar:
 #with col2:
     # Main screen
 
-st.header(f'1.  KPIs Overview')
-
+st.header(f'1. How is our bussines doing? (KPIs Overview)')
+st.write("How is our bussines doing?")
 kpis_calculation = KPIsCalculation(current_date)
 
 this_year_sales_qty, this_year_sales_val, percent_change_qty, percent_change_val = kpis_calculation.get_yoy_sales(dataset_with_predictions)
@@ -179,14 +179,14 @@ col3.metric("Out of Stock situations", f"{this_year_oos_cases} cases", f"{percen
 
 
 
-st.header(f'2. Inventory on current date and total predicted sales up to {selected_date}')
+st.header(f'2. What is the current and predicted inventory status? (Inventory on current date up to {selected_date})')
 
 inventory_on_current_date = get_inventory_on_current_date(dataset_with_inventory, items_list, current_date)
 aggregated_predictions = get_aggregated_predictions(dataset_with_predictions, items_list, current_date, selected_date).round(1)
 inventory_and_predictions = inventory_on_current_date.merge(aggregated_predictions, how='left', on=['item_name'])
 inventory_and_predictions.loc[:, 'inventory_at_selected_date'] = inventory_and_predictions['inventory'] - inventory_and_predictions['prediction']
 st.dataframe(
-    inventory_and_predictions, 
+    inventory_and_predictions.sort_values(by='inventory_at_selected_date'), 
     column_config={
         'item_name': 'Item name', 
         'inventory': 'Inventory on selected (current) date',
@@ -194,7 +194,7 @@ st.dataframe(
         'inventory_at_selected_date': 'Inventory at selected date (End of day)'},
     hide_index=True)
 
-st.header(f'3. All items total sales quantity in 365 days before {current_date}')
+st.header(f'3. What are the top selling items? (Total sales quantity in 365 days before {current_date})')
 sales_last_365d = get_last_365d_sales(dataset_with_predictions, all_items, current_date)
 visualize_last_365d_sales(sales_last_365d)
 
