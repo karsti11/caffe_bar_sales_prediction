@@ -206,13 +206,13 @@ with st.sidebar:
 
   
 scores_df = calculate_scores_per_item_last_365d(dataset_with_predictions, current_date)
-st.header(f'1. Visualize total scores per item for last 365 days before current date')
+st.header(f'1. How good are model predictions per item? (for last 365 days before current date)')
 visualize_totals(scores_df)
 
-st.header(f'2. Visualize predictions for a single item ({date_from} to {date_to})')
+st.header(f'2. How do predictions for {selected_item} look like? ({date_from} to {date_to})')
 visualize_preds(dataset_with_predictions, selected_item, date_from, current_date, date_to)
 
-st.subheader(f'2.1 Visualize single prediction feature importances: {selected_date}')
+st.subheader(f'2.1 Which are the most important features for {selected_date}?')
 visualize_shap_waterfall(dataset_with_predictions, selected_item, selected_date)
 
 
